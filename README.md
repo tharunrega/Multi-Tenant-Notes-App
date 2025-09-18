@@ -1,33 +1,121 @@
-# Multi-tenant SaaS Sample Application
+# Multi-Tenant SaaS Notes Application
 
-This is the companion code for the blog post [Build a multi-tenant SaaS application: A complete guide from design to implementation](https://blog.logto.io/build-multi-tenant-saas-application).
+A complete multi-tenant SaaS Notes Application built with Node.js, React, and SQLite, featuring JWT authentication, role-based access control, and subscription-based feature gating.
 
-This demo application showcases how to build a SaaS application with multi-tenant support using [Logto](https://logto.io).
+## 🏗️ Multi-Tenancy Architecture
 
-The project consists of a frontend application and a backend service that demonstrate organization management, user authentication, document management, and Logto management API integration features.
+This application uses a **shared schema with tenant ID** approach for multi-tenancy:
 
-## About This Project
+- **Database**: Single SQLite database with tenant isolation via `tenant_id` foreign keys
+- **Isolation**: All data queries include tenant filtering to ensure strict data isolation
+- **Scalability**: Easy to migrate to PostgreSQL/MySQL for production with the same schema design
+- **Benefits**: 
+  - Simple to implement and maintain
+  - Cost-effective for small to medium scale
+  - Easy backup and migration
+  - Shared resources reduce operational overhead
 
-This codebase implements the concepts and features discussed in the blog post, including:
-- Multi-tenant organization management
-- User authentication with Logto
-- Document management system
-- Organization level role-based access control
-- Logto management API integration
+### Database Schema
 
-## Project Structure
+```sql
+-- Tenants table
+CREATE TABLE tenants (
+  id TEXT PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  plan TEXT DEFAULT 'free' CHECK(plan IN ('free', 'pro')),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
-- `frontend/`: React-based frontend application
-- `backend/`: Node.js backend service
+-- Users table with tenant relationship
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'member' CHECK(role IN ('admin', 'member')),
+  tenant_id TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenants (id)
+);
 
-## Quick Start
+-- Notes table with tenant isolation
+CREATE TABLE notes (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenants (id),
+  FOREIGN KEY (user_id) REFERENCES users (id)
+);
+```
 
-To run the complete application locally, you'll need to:
+## 🚀 Features
 
-1. Start the backend service first
-2. Start the frontend application
-3. Configure the proper environment variables in both projects
-4. Ensure your Logto application is properly configured with the correct redirect URIs
+### Multi-Tenancy
+- ✅ Support for multiple tenants (Acme and Globex)
+- ✅ Strict data isolation between tenants
+- ✅ Tenant-specific user management
+
+### Authentication & Authorization
+- ✅ JWT-based authentication
+- ✅ Role-based access control (Admin/Member)
+- ✅ Predefined test accounts with password: `password`
+
+### Subscription Management
+- ✅ Free Plan: Limited to 3 notes per tenant
+- ✅ Pro Plan: Unlimited notes
+- ✅ Admin-only upgrade endpoint
+- ✅ Real-time limit enforcement
+
+### Notes Management
+- ✅ Full CRUD operations for notes
+- ✅ Tenant-isolated note storage
+- ✅ Role-based permissions
+
+### Deployment
+- ✅ Vercel-ready configuration
+- ✅ CORS enabled for API access
+- ✅ Health endpoint for monitoring
+
+## 🧪 Test Accounts
+
+All test accounts use the password: `password`
+
+| Email | Role | Tenant | Plan |
+|-------|------|--------|------|
+| admin@acme.test | Admin | Acme | Free |
+| user@acme.test | Member | Acme | Free |
+| admin@globex.test | Admin | Globex | Free |
+| user@globex.test | Member | Globex | Free |
+
+## 📡 API Endpoints
+
+### Authentication
+- `POST /auth/login` - User login
+- `GET /me` - Get current user profile
+
+### Notes CRUD
+- `GET /notes` - List all notes for current tenant
+- `GET /notes/:id` - Get specific note
+- `POST /notes` - Create new note
+- `PUT /notes/:id` - Update note
+- `DELETE /notes/:id` - Delete note
+
+### Tenant Management
+- `POST /tenants/:slug/upgrade` - Upgrade tenant to Pro plan (Admin only)
+
+### System
+- `GET /health` - Health check endpoint
+- `GET /` - API information
+
+## 🛠️ Local Development
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
 
 ### Backend Setup
 
@@ -36,14 +124,16 @@ To run the complete application locally, you'll need to:
 cd backend
 ```
 
-2. Copy the environment file and configure Logto settings:
-```bash
-cp .env.example .env
-```
-
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 npm install
+```
+
+3. Set environment variables (optional):
+```bash
+# Create .env file
+echo "JWT_SECRET=your-super-secret-jwt-key-change-in-production" > .env
+echo "PORT=3000" >> .env
 ```
 
 4. Start the development server:
@@ -51,7 +141,7 @@ npm install
 npm run dev
 ```
 
-The backend server will be running at http://localhost:3000.
+The backend API will be running at http://localhost:3000
 
 ### Frontend Setup
 
@@ -60,27 +150,15 @@ The backend server will be running at http://localhost:3000.
 cd frontend
 ```
 
-2. Configure the environment variables in `src/env.ts`:
-```typescript
-export const APP_ENV = {
-  logto: {
-    endpoint: "<YOUR_LOGTO_ENDPOINT>",
-    appId: "<YOUR_LOGTO_APP_ID>",
-  },
-  api: {
-    baseUrl: "<YOUR_BACKEND_API_BASE_URL>",
-    resourceIndicator: "<YOUR_API_RESOURCE_INDICATOR>",
-  },
-  app: {
-    redirectUri: "<YOUR_REDIRECT_URI>", // Ensure this matches the redirect URI in your Logto app settings in the Console
-    signOutRedirectUri: "<YOUR_SIGN_OUT_REDIRECT_URI>", // Ensure this matches the sign out redirect URI in your Logto app settings in the Console
-  },
-};
-```
-
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 npm install
+```
+
+3. Set environment variables (optional):
+```bash
+# Create .env file
+echo "VITE_API_BASE_URL=http://localhost:3000" > .env
 ```
 
 4. Start the development server:
@@ -88,14 +166,89 @@ npm install
 npm run dev
 ```
 
-The frontend application will be running at http://localhost:5173.
+The frontend will be running at http://localhost:5173
 
-## Learn More
+## 🚀 Vercel Deployment
 
-For a detailed explanation of the concepts and implementation details, please read the accompanying blog post:
-[Build a multi-tenant SaaS application: A complete guide from design to implementation](https://blog.logto.io/build-multi-tenant-saas-application)
+### Backend Deployment
 
-## License
+1. Install Vercel CLI:
+```bash
+npm i -g vercel
+```
+
+2. Navigate to backend directory:
+```bash
+cd backend
+```
+
+3. Deploy:
+```bash
+vercel
+```
+
+4. Set environment variables in Vercel dashboard:
+   - `JWT_SECRET`: Your secure JWT secret key
+   - `NODE_ENV`: production
+
+### Frontend Deployment
+
+1. Navigate to frontend directory:
+```bash
+cd frontend
+```
+
+2. Deploy:
+```bash
+vercel
+```
+
+3. Set environment variables in Vercel dashboard:
+   - `VITE_API_BASE_URL`: Your deployed backend URL
+
+## 🔒 Security Features
+
+- **JWT Authentication**: Secure token-based authentication
+- **Password Hashing**: bcrypt for secure password storage
+- **CORS Configuration**: Properly configured for production
+- **Input Validation**: Server-side validation for all endpoints
+- **SQL Injection Protection**: Parameterized queries
+- **Tenant Isolation**: Strict data separation between tenants
+
+## 📊 Database
+
+The application uses SQLite for simplicity and ease of deployment. For production use, consider migrating to PostgreSQL or MySQL:
+
+1. **SQLite**: Perfect for development and small-scale deployments
+2. **PostgreSQL/MySQL**: Recommended for production with high concurrency
+
+The schema is designed to be database-agnostic and can be easily migrated.
+
+## 🧪 Testing
+
+The application includes comprehensive test scenarios:
+
+1. **Health Check**: Verify API availability
+2. **Authentication**: Test all predefined accounts
+3. **Tenant Isolation**: Ensure data separation
+4. **Role-Based Access**: Verify Admin/Member permissions
+5. **Subscription Limits**: Test Free plan restrictions
+6. **Upgrade Flow**: Test Pro plan upgrade
+7. **CRUD Operations**: Test all note operations
+
+## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📞 Support
+
+For questions or issues, please open an issue in the repository.
 

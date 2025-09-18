@@ -1,49 +1,42 @@
-import {
-  LogtoProvider,
-  LogtoConfig,
-  useLogto,
-  UserScope,
-  ReservedResource,
-} from "@logto/react";
-import { Routes, Route } from "react-router-dom";
-import Landing from "./Landing";
-import Dashboard from "./Dashboard";
-import Callback from "../Callback";
-import OrganizationPage from "../OrganizationPage";
-import { APP_ENV } from "../../env";
-
-const config: LogtoConfig = {
-  endpoint: APP_ENV.logto.endpoint,
-  appId: APP_ENV.logto.appId,
-  scopes: [UserScope.Organizations, "read:documents", "create:documents", "create:organization"],
-  resources: [ReservedResource.Organization, APP_ENV.api.resourceIndicator],
-};
-
-function App() {
-  return (
-    <LogtoProvider config={config}>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-        <Routes>
-          <Route path="/callback" element={<Callback />} />
-          <Route path="/*" element={<AppContent />} />
-        </Routes>
-      </div>
-    </LogtoProvider>
-  );
-}
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "../../contexts/AuthContext";
+import LoginPage from "../LoginPage";
+import Dashboard from "../Dashboard";
 
 function AppContent() {
-  const { isAuthenticated } = useLogto();
+  const { user, isLoading } = useAuth();
 
-  if (!isAuthenticated) {
-    return <Landing />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
   }
 
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/:orgId" element={<OrganizationPage />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <AppContent />
+      </div>
+    </AuthProvider>
   );
 }
 
